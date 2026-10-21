@@ -16,7 +16,11 @@ jobs:
       - name: Unpack zip if needed
         run: |
           if ! grep -rl --include=settings.gradle.kts 'include(":app")' . >/dev/null 2>&1; then
-            for z in *.zip; do [ -f "$z" ] && unzip -oq "$z" -d "unpacked/${z%.zip}"; done
+            for z in *.zip; do
+              [ -f "$z" ] || continue
+              mkdir -p "unpacked/${z%.zip}"
+              unzip -oq "$z" -d "unpacked/${z%.zip}"
+            done
           fi
 
       - name: Locate Android project

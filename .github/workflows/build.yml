@@ -12,6 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Locate Gradle project
+        id: loc
+        run: |
+          f=$(find . -name settings.gradle.kts -not -path './.git/*' | head -n1)
+          if [ -z "$f" ]; then
+            echo "No settings.gradle.kts found in repo. Files present:"; find . -not -path './.git/*' -type f | head -50; exit 1
+          fi
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+          echo "Gradle project at: $(dirname "$f")"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,6 +32,7 @@ jobs:
           gradle-version: 8.7
 
       - name: Build and run tests
+        working-directory: ${{ steps.loc.outputs.dir }}
         run: gradle build --no-daemon
 
       - name: Upload test report
@@ -29,4 +40,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-report
-          path: build/reports/tests/test
+          path: ${{ steps.loc.outputs.dir }}/build/reports/tests/test

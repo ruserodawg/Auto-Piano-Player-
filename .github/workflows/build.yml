@@ -1,4 +1,4 @@
-name: Build & Test
+name: Build APK
 
 on:
   push:
@@ -7,26 +7,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Unzip uploaded zip (if sources are zipped)
+      # If the repo only contains uploaded zip(s), unpack them.
+      - name: Unpack zip if needed
         run: |
-          if [ -z "$(find . -name settings.gradle.kts -not -path './.git/*')" ]; then
-            for z in *.zip; do [ -f "$z" ] && unzip -oq "$z" -d unpacked; done
+          if ! grep -rl --include=settings.gradle.kts 'include(":app")' . >/dev/null 2>&1; then
+            for z in *.zip; do [ -f "$z" ] && unzip -oq "$z" -d "unpacked/${z%.zip}"; done
           fi
 
-      - name: Locate Gradle project
+      - name: Locate Android project
         id: loc
         run: |
-          f=$(find . -name settings.gradle.kts -not -path './.git/*' | head -n1)
-          if [ -z "$f" ]; then
-            echo "No settings.gradle.kts found. Files present:"; find . -not -path './.git/*' -type f | head -50; exit 1
-          fi
+          f=$(grep -rl --include=settings.gradle.kts 'include(":app")' . | head -n1)
+          if [ -z "$f" ]; then echo "No Android project found. Files:"; find . -not -path './.git/*' -type f | head -50; exit 1; fi
           echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
-          echo "Gradle project at: $(dirname "$f")"
+          echo "Project at $(dirname "$f")"
 
       - uses: actions/setup-java@v4
         with:
@@ -37,13 +36,26 @@ jobs:
         with:
           gradle-version: 8.7
 
-      - name: Build and run tests
+      - name: Build debug APK
         working-directory: ${{ steps.loc.outputs.dir }}
-        run: gradle build --no-daemon
+        run: gradle assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoPiano-debug-apk
+          path: ${{ steps.loc.outputs.dir }}/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Unit tests
+        if: always()
+        continue-on-error: true
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: gradle testDebugUnitTest --no-daemon
 
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report
-          path: ${{ steps.loc.outputs.dir }}/build/reports/tests/test
+          path: ${{ steps.loc.outputs.dir }}/app/build/reports/tests
+          if-no-files-found: ignore

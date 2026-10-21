@@ -12,12 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Unzip uploaded zip (if sources are zipped)
+        run: |
+          if [ -z "$(find . -name settings.gradle.kts -not -path './.git/*')" ]; then
+            for z in *.zip; do [ -f "$z" ] && unzip -oq "$z" -d unpacked; done
+          fi
+
       - name: Locate Gradle project
         id: loc
         run: |
           f=$(find . -name settings.gradle.kts -not -path './.git/*' | head -n1)
           if [ -z "$f" ]; then
-            echo "No settings.gradle.kts found in repo. Files present:"; find . -not -path './.git/*' -type f | head -50; exit 1
+            echo "No settings.gradle.kts found. Files present:"; find . -not -path './.git/*' -type f | head -50; exit 1
           fi
           echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
           echo "Gradle project at: $(dirname "$f")"
